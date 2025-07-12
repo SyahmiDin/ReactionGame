@@ -1,0 +1,122 @@
+﻿@page "/game"
+@inject IJSRuntime JS
+
+<h3 style="text-align:center; color:white; margin-top:20px;">🚀 Klik Sebanyak Mungkin!</h3>
+
+<div class="container" @ref="containerRef" style="position: relative; height: 80vh;">
+    @if (!gameStarted)
+    {
+        <button class="game-button" @onclick="StartGame">Mula</button>
+    }
+    else
+    {
+        <div class="score-board">
+            <p><strong>Masa Tinggal:</strong> @timeLeft saat</p>
+            <p><strong>Skor:</strong> @score</p>
+        </div>
+
+        <button class="moving-button"
+                style="position: absolute; top:@topPx; left:@leftPx;"
+                @onclick="HandleClick">
+            Klik!
+        </button>
+    }
+
+    @if (gameEnded)
+    {
+        <p style="text-align:center;"><strong>Permainan Tamat!</strong> Skor akhir: @score</p>
+        <p style="text-align:center;">🎖️ Skor Tertinggi: @highScore</p>
+        <button class="game-button" @onclick="RestartGame">Main Lagi</button>
+    }
+</div>
+
+@code {
+    private int score = 0;
+    private int highScore = 0;
+    private int timeLeft = 10;
+    private bool gameStarted = false;
+    private bool gameEnded = false;
+    private string topPx = "200px";
+    private string leftPx = "300px";
+    private ElementReference containerRef;
+    private double containerWidth;
+    private double containerHeight;
+
+
+    private System.Threading.Timer timer;
+
+    async void StartGame()
+{
+    score = 0;
+    timeLeft = 10;
+    gameEnded = false;
+    gameStarted = true;
+
+    // Ambil saiz kontena
+    var size = await JS.InvokeAsync<ContainerSize>("getContainerSize", containerRef);
+    containerWidth = size.Width;
+    containerHeight = size.Height;
+
+    // ✅ Hanya panggil MoveButton kalau width > 0
+    if (containerWidth > 0 && containerHeight > 0)
+    {
+        MoveButton();
+    }
+
+    timer?.Dispose();
+    timer = new System.Threading.Timer(_ =>
+    {
+        if (timeLeft > 0)
+        {
+            timeLeft--;
+            InvokeAsync(StateHasChanged);
+        }
+        else
+        {
+            gameEnded = true;
+            gameStarted = false;
+
+            if (score > highScore)
+                highScore = score;
+
+            timer?.Dispose();
+            InvokeAsync(StateHasChanged);
+        }
+    }, null, 1000, 1000);
+}
+
+
+    void MoveButton()
+    {
+        score++;
+
+        var rnd = new Random();
+        int safeWidth = Math.Max((int)containerWidth - 100, 50);
+        int safeHeight = Math.Max((int)containerHeight - 100, 50);
+
+        var top = rnd.Next(10, safeHeight);
+        var left = rnd.Next(10, safeWidth);
+
+        topPx = $"{top}px";
+        leftPx = $"{left}px";
+    }
+
+    async void HandleClick()
+    {
+        await JS.InvokeVoidAsync("playClickSound");
+        MoveButton();
+    }
+
+    void RestartGame()
+    {
+        StartGame();
+    }
+
+    public class ContainerSize
+    {
+        public double Width { get; set; }
+        public double Height { get; set; }
+    }
+
+
+}
